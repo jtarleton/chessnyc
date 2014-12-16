@@ -1,4 +1,4 @@
-<?php 
+ <?php 
 class Chesspiece 
 {
 	public $type, $kolor;
@@ -141,7 +141,42 @@ class WhiteBishop extends Bishop
 {
 	public static $color = 'white';
 	public $asciicode = '&#9815;';
+	public $queenkingside;
+
 	public $illegalCoordinates = array(); 
+
+
+
+	public function __construct(){
+
+		parent::__construct();
+		$this->setIllegalCoordinates(); 	
+	}
+
+
+
+	public function setIllegalCoordinates(){
+		$this->queenkingside = 'q';
+		$this->illegalCoordinates =($this->queenkingside == 'q') 
+			? array('B1','D1','F1','H1', 
+					'A2','C2','E2','G2',
+					'B3','D3','F3','H3',
+					'A4','C4','E4','G4',
+					'B5','D5','F5','H5',
+					'A6','C6','E6','G6',
+					'B7','D7','F7','H7',
+					'A8','C8','E8','G8'
+				)
+			: array('A1','C1','E1','G1',
+				'B2','D2','F2','H2', 
+				'A3','C3','E3','G3',
+				'B4','D4','F4','H4', 
+				'A5','C5','E5','G5',
+				'B6','D6','F6','H6', 
+				'A7','C7','E7','G7',
+				'B8','D8','F8','H8'
+			);
+	}
 }
 class BlackBishop extends Bishop
 {
@@ -363,11 +398,21 @@ class SetupUtils {
 	}
 
 	public static function getPieces(){
+
+		$wb = array();
+		$wb = WhiteBishops::getPieces();
+		$wb['c1']->queenkingside = 'q'; 
+		$wb['f1']->queenkingside = 'k';
+		$wb['c1']->setIllegalCoordinates(); 
+		$wb['f1']->setIllegalCoordinates();
+		//die(var_dump($wb));
+		//die(var_dump($wb));	
+		//$queenkingside
 		return array(
 			'pawns'   => array_merge(WhitePawns::getPieces(),   BlackPawns::getPieces()   ),
 			'rooks'   => array_merge(WhiteRooks::getPieces(),   BlackRooks::getPieces()   ),
 			'knights' => array_merge(WhiteKnights::getPieces(), BlackKnights::getPieces() ),
-			'bishops' => array_merge(WhiteBishops::getPieces(), BlackBishops::getPieces() ),
+			'bishops' => array_merge($wb, BlackBishops::getPieces() ),
 			'kings'   => array_merge(WhiteKings::getPieces(),   BlackKings::getPieces()   ),
 			'queens'  => array_merge(WhiteQueens::getPieces(),  BlackQueens::getPieces()  )
 		);
@@ -375,7 +420,17 @@ class SetupUtils {
 	public static function mapBoard(){
 		$setup = array();
 		foreach(self::getPieces() as $type=>$pieces){
-			foreach($pieces as $pos=>$obj){
+			foreach($pieces as $pos=>&$obj){
+
+				if(strtolower($pos) == 'c1'){
+					$obj->queenkingside = 'q'; 
+					$obj->setIllegalCoordinates(); 	
+				}
+				if(strtolower($pos) == 'f1'){
+					$obj->queenkingside = 'k';
+					$obj->setIllegalCoordinates(); 
+				}
+
 				$setup[strtoupper($pos)] = $obj;
 			}
 		}
@@ -427,7 +482,7 @@ class Move
     }
      
 	public function isValid(){
-		
+		echo '';
 		if( in_array($this->originSquare,      $this->movingPiece->illegalCoordinates) || 
 			in_array($this->destinationSquare, $this->movingPiece->illegalCoordinates)
 			){
@@ -498,10 +553,14 @@ class Move
 	}
 
 	public function validateBishopMove(){
-		if (0) {
-			return true;
+
+		//echo 'called validator';
+		if( in_array($this->originSquare->pos,      $this->movingPiece->illegalCoordinates) || 
+			in_array($this->destinationSquare->pos, $this->movingPiece->illegalCoordinates)
+			){
+			return false;
 		}
-		return false;
+		return true;
 	}
 
 	public function validateRookMove(){

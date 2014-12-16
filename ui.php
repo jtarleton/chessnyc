@@ -58,7 +58,7 @@ a {
 <script src="//code.jquery.com/ui/1.11.2/jquery-ui.js"></script>
 <link rel="stylesheet" href="/resources/demos/style.css">
 <style>
-#draggable, #draggable2 { width: 100px; height: 100px; padding: 0.5em; float: left; margin: 10px 10px 10px 0; }
+#draggable { width: 100px; height: 100px; padding: 0.5em; float: left; margin: 10px 10px 10px 0; }
 #droppable { width: 150px; height: 150px; padding: 0.5em; float: left; margin: 10px; }
 
 .ui-state-hover,
@@ -81,6 +81,12 @@ a {
 	background: lime url("images/ui-bg_glass_55_fbf9ee_1x400.png") 50% 50% repeat-x;
 	color: orange;
 } 
+
+.ui-state-highlightinvalid {
+	border: 1px solid crimson;
+	background: crimson url("images/ui-bg_glass_55_fbf9ee_1x400.png") 50% 50% repeat-x;
+	color: orange;
+}
 
 </style>
 <script type="text/javascript">
@@ -134,6 +140,59 @@ function validatemove(){
 }
 
 
+
+function validatemoveover(obj){
+	var data = {
+		"originSquare" : jQuery('#originSquare').val(),
+		"destSquare"   : obj.attr('id'),
+		"pieceType"    : jQuery('#pieceType').val()
+	};
+	var success2 = function( data ) {
+
+		/* 
+		{"originSquare":{
+			"color":null,"pos":"E2","rank":"2","col":"E"},
+			"destinationSquare":{"color":null,"pos":"E4","rank":"4","col":"E"},
+			
+			"movingPiece":
+			{"asciicode":"&#9817;",
+			"illegalCoordinates":["a1","b1","c1","d1","e1","f1","g1","h1"],
+			"type":"pawn","kolor":"white"},
+		"isCheck":false,"isMate":false,
+		"isFirstMove":true,
+		"rankDiff":2,
+		"valid":true}
+
+		
+jQuery('ul#log').append('Moving '+jQuery('#originSquare').val()  + ' over '+obj.attr('id') + ' returned '+ data.valid);
+*/
+		if(data.valid == false){
+
+			jQuery('#anchor'+jQuery('#originSquare').val()).removeClass('ui-draggable').removeClass('ui-draggable-handle');
+			jQuery('#'+obj.attr('id')).removeClass('ui-droppable');
+			jQuery('#'+obj.attr('id')).addClass('ui-state-highlightinvalid');
+			//jQuery( ".pawn" ).draggable({ revert: "valid" });
+		} else {
+			jQuery('#anchor'+jQuery('#originSquare').val()).addClass('ui-draggable').addClass('ui-draggable-handle');
+			
+			jQuery('#'+obj.attr('id')).addClass('ui-droppable');
+			jQuery('.ui-droppable').removeClass('ui-state-highlightinvalid');
+			jQuery('#'+obj.attr('id')).removeClass('ui-state-highlightinvalid').addClass('ui-state-hover');
+		}
+	};
+
+	jQuery.ajax({
+	  type: "POST",
+	  url: 'movecallback.php',
+	  data: data,
+	  success: success2,
+	  dataType: 'json'
+	});
+}
+function snapToStart(dragger, target){
+    dragger.animate({top:0,left:0},{duration:600,easing:'easeOutBack'});
+
+}
 function ucfirst(str) {
   //  discuss at: http://phpjs.org/functions/ucfirst/
   str += '';
@@ -163,6 +222,15 @@ jQuery('#originSquare').val(jQuery(this).parent('td').attr('id'));
 activepiece = classesarr[0] +  classesarr[1] + ' ' + jQuery(this).parent('td').attr('id');
 
 });
+var outcallback = function(event, ui){
+            jQuery(ui.helper).mouseup(function() {
+                snapToStart(ui.draggable,$(this)); 
+              //  jQuery('.ui-droppable').removeClass('ui-state-highlightinvalid');
+            });
+        };
+var overcallback = function( event, ui ) {
+		validatemoveover(jQuery(this));
+}
 
 var dropcallback = function( event, ui ) {
 
@@ -182,17 +250,18 @@ jQuery('ul#log').append('<li>'+ activepiece +'</li>');
 
 
 
-jQuery( "#draggable2" ).draggable({ revert: "invalid" });
 
-jQuery( ".pawn, .knight" ).draggable({ revert: "invalid" });
+jQuery( ".pawn, .knight, .bishop, .rook, .queen, .king" ).draggable({ revert: "invalid" });
 
-jQuery( "#A3, #A4, #B3, #B4, #C3, #C4, #D3, #D4, #E3, #E4,#F3, #F4,#G3, #G4, #H3, #H4, #A5, #A6, #B5, #B6, #C5, #C6, #D5, #68, #E5, #E6,#F5, #F6,#G5, #G6, #H5, #H6" ).droppable({
+//jQuery( "#A3, #A4, #B3, #B4, #C3, #C4, #D3, #D4, #E3, #E4,#F3, #F4,#G3, #G4, #H3, #H4, #A5, #A6, #B5, #B6, #C5, #C6, #D5, #68, #E5, #E6,#F5, #F6,#G5, #G6, #H5, #H6" )
+jQuery('.csq').droppable({
 
 	activeClass: "ui-state-default",
 
 	hoverClass : "ui-state-hover"  ,
-
-	drop: dropcallback
+over: overcallback,
+	drop: dropcallback,
+	 //out: outcallback
 
 });
 
@@ -208,9 +277,9 @@ jQuery( "#A3, #A4, #B3, #B4, #C3, #C4, #D3, #D4, #E3, #E4,#F3, #F4,#G3, #G4, #H3
 	<?php foreach($row as $square):
 		$coord = strtoupper($square->pos);  
 		$po    = (array_key_exists($coord, $board->setup)) ? $board->setup[$coord] : null; ?>
-		<td id="<?php echo $coord; ?>"> 
+		<td class="csq" id="<?php echo $coord; ?>"> 
 			<?php if((isset($po))): ?>
-			<a href="#" class="<?php echo $po->type; ?> <?php echo $po->kolor; ?>"><?php echo (isset($po)) ? $po->asciicode : null; ?></a>
+			<a href="#" id="anchor<?php echo $coord; ?>" class="<?php echo $po->type; ?> <?php echo $po->kolor; ?>"><?php echo (isset($po)) ? $po->asciicode : null; ?></a>
 			<?php endif; ?>   
 		</td>
 	<?php endforeach; ?>
