@@ -1,4 +1,8 @@
-<?php require_once('chess.php'); ?>
+<?php 
+session_start();
+$_SESSION['board'] = null;
+ini_set('xdebug.max_nesting_level', 1000);
+require_once('chess.php'); ?>
 
 <!DOCTYPE html>
 <head>
@@ -26,6 +30,7 @@ a {
 	text-decoration:none;
 	text-shadow:0 1px #fff;
 	width:80px;
+	cursor:pointer;
 }
 #chess_board { border:5px solid #333; }
 #chess_board td {
@@ -58,6 +63,9 @@ a {
 <script src="//code.jquery.com/ui/1.11.2/jquery-ui.js"></script>
 <link rel="stylesheet" href="/resources/demos/style.css">
 <style>
+.hilite {
+	background-color: #FFFF7E;
+}
 #draggable { width: 100px; height: 100px; padding: 0.5em; float: left; margin: 10px 10px 10px 0; }
 #droppable { width: 150px; height: 150px; padding: 0.5em; float: left; margin: 10px; }
 
@@ -90,6 +98,22 @@ a {
 
 </style>
 <script type="text/javascript">
+function rewriteBoard(){
+	jQuery.ajax({
+		type: "GET",
+		url: 'boardcallback.php',
+		success: function(dat){
+			jQuery('#rewriteBoard').html('').html(dat);
+			//for(i in dat){
+				//jQuery('#rewriteBoard').append(dat[i]);
+				//var op = dat[i].occupyingPiece;
+				//if( op.type !='undefined')
+				//jQuery('#rewriteBoard').append(op.type+'<br />');
+			//}
+		},
+		dataType: 'html'
+	});
+}
 
 function validatemove(){
 	var data = {
@@ -98,7 +122,6 @@ function validatemove(){
 		"pieceType"    : jQuery('#pieceType').val()
 	};
 	var success = function( data ) {
-
 		/* 
 		{"originSquare":{
 			"color":null,"pos":"E2","rank":"2","col":"E"},
@@ -114,21 +137,20 @@ function validatemove(){
 		"valid":true}
 
 		*/
-
 	if(data.movingPiece.kolor=='white'){
-	  jQuery( "#whitelog" ).append('<li>' + data.movingPiece.asciicode +' '+ ucfirst(data.movingPiece.kolor) + ' ' + ucfirst(data.movingPiece.type) + ' '+ data.originSquare.pos + ' '+ data.destinationSquare.pos +' '+data.valid +'</li>');
+	  jQuery( "#whitelog" ).append('<li>' + data.movingPiece.asciicode +' '+ ucfirst(data.movingPiece.queenkingside) +' '+ ucfirst(data.movingPiece.kolor) + ' ' + ucfirst(data.movingPiece.type) + ' '+ data.originSquare.pos + ' '+ data.destinationSquare.pos +' '+data.valid +'</li>');
 	}
 	else if(data.movingPiece.kolor=='black') {
-	  jQuery( "#blacklog" ).append('<li>' + data.movingPiece.asciicode +' '+ ucfirst(data.movingPiece.kolor) + ' ' + ucfirst(data.movingPiece.type) + ' '+ data.originSquare.pos + ' '+ data.destinationSquare.pos +' '+data.valid +'</li>');
-
+	  jQuery( "#blacklog" ).append('<li>' + data.movingPiece.asciicode +' '+ ucfirst(data.movingPiece.queenkingside) +' '+ ucfirst(data.movingPiece.kolor) + ' ' + ucfirst(data.movingPiece.type) + ' '+ data.originSquare.pos + ' '+ data.destinationSquare.pos +' '+data.valid +'</li>');
 	}
-
-		if(data.valid == false){
-			//jQuery( ".pawn" ).draggable({ revert: "valid" });
-		} else {
-			return;
-		}
-	};
+	//alert(data.destinationSquare.occupyingPiece.pos);
+	if(data.valid == false){
+		//jQuery( ".pawn" ).draggable({ revert: "valid" });
+	} else {
+		rewriteBoard();
+		return;
+	}
+};
 
 	jQuery.ajax({
 	  type: "POST",
@@ -193,6 +215,30 @@ function snapToStart(dragger, target){
     dragger.animate({top:0,left:0},{duration:600,easing:'easeOutBack'});
 
 }
+
+function hilite(v){
+	v.addClass('hilite');
+	//j=0;
+	//while(j<500) {
+	//	j++;
+	//	v.toggle( "highlight" );
+	//}
+}
+
+function clearHilites(){
+	v = jQuery('a');
+	v.each( obj, function( key, value ) {
+		obj.removeClass('hilite');
+		//alert( key + ": " + value );
+		//obj.toggle( "highlight" );
+	});
+
+	//v.each( obj, function( key, value ) {
+		//alert( key + ": " + value );
+	//	obj.toggle( "highlight" );
+	//});
+	
+}
 function ucfirst(str) {
   //  discuss at: http://phpjs.org/functions/ucfirst/
   str += '';
@@ -200,9 +246,44 @@ function ucfirst(str) {
     .toUpperCase();
   return f + str.substr(1);
 }
+function updateLastClicked(v){
+	var str = v.attr('id');
+	jQuery('#lastclickedid').html('').html(  str.replace('anchor',''));
+}
 
 jQuery(document).ready(function(){
+
+	jQuery('#lastclickedid').html('Waiting for first move...');
+
+	jQuery('a').unbind('click').bind('click', function(){
+
+		updateLastClicked(jQuery(this));
+		
+		var hasclass = jQuery(this).hasClass('pawn') 
+			|| jQuery(this).hasClass('rook') 
+			|| jQuery(this).hasClass('knight')
+			|| jQuery(this).hasClass('bishop')
+			|| jQuery(this).hasClass('queen')
+			|| jQuery(this).hasClass('king');
+
+		if(hasclass){
+			//clearHilites();
+			hilite(jQuery(this)); 
+		}
+		
+	});
+
+	jQuery('a').unbind('blur').bind('blur', function(){
+		
+		jQuery('a').removeClass('hilite');
+		//alert(jQuery(this).attr('id'));
+	});
+
+
+
+
 	jQuery('a').unbind('mouseleave').bind('mouseleave', function (){ 
+	
 	jQuery('#pieceType').val('');
 	jQuery('#originSquare').val('');
 	jQuery('#destSquare').val('');
@@ -270,19 +351,32 @@ over: overcallback,
 </head>
 </style>
 </head>
-<body><div style="float:left;">
+<body>
+	<div>Last Click: 
+		<div id="lastclickedid"></div>
+	</div>
+
+
+	<div>Current Board State:
+		<div id="rewriteBoard"></div>
+	</div>
+
+	<div style="float:left;">
 <table id="chess_board" cellpadding="0" cellspacing="0">
 <?php foreach($board->squares as $rank=>$row): ?>
 <tr>
-	<?php foreach($row as $square):
+	<?php if(!empty($row)): foreach($row as $square):
 		$coord = strtoupper($square->pos);  
 		$po    = (array_key_exists($coord, $board->setup)) ? $board->setup[$coord] : null; ?>
 		<td class="csq" id="<?php echo $coord; ?>"> 
 			<?php if((isset($po))): ?>
-			<a href="#" id="anchor<?php echo $coord; ?>" class="<?php echo $po->type; ?> <?php echo $po->kolor; ?>"><?php echo (isset($po)) ? $po->asciicode : null; ?></a>
+			<a href="javascript:void(0);" id="anchor<?php echo $coord; ?>" class="<?php echo $po->type; ?> <?php echo $po->kolor; ?>"><?php echo (isset($po)) ? $po->asciicode : null; ?></a>
+			<?php else: ?>
+			<a id="anchor<?php echo $coord; ?>"></a>
+			
 			<?php endif; ?>   
 		</td>
-	<?php endforeach; ?>
+	<?php endforeach; endif; ?>
 </tr>
 <?php endforeach; ?>
 </table></div>
@@ -335,5 +429,7 @@ over: overcallback,
 </select>
 </form>
 </div>
+
+
 </body>
 </html>

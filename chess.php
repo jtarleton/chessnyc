@@ -1,15 +1,85 @@
  <?php 
-class Chesspiece 
-{
-	public $type, $kolor;
 
-	public function __construct(){
+
+class ChessBoard extends ChessSquares {
+	
+	public $squares = array(), $setup = array();
+	private static $_singleton;
+
+	private function __construct(){
+		$this->init();
+	}
+	public function setSqu($sqobj){
+		self::getInstance()->squares[strtoupper($sqobj->pos)] = $sqobj;
+	}
+
+	public function infoToArray(){
+		return self::getInstance()->squares;
+		/* $all = array();
+		foreach(array_values(ChessSquares::$allPositionsFlat) as $posit){
+			$all[$posit] = get_class(ChessSquare::get($posit)->getOccupyingPiece());
+		}
+		return $all; */
+	}
+	public function init(){
+		$this->squares = ChessSquares::getAll();
+		/* foreach($this->squares as $row){
+			foreach($row as $sq){
+				$this->updateSquare($sq->pos, new stdClass()); 
+			}
+		} */
+		$flatsqs = array();
+		foreach($this->squares as $row=>$sqs){
+			foreach($sqs as $i=>$sq) $flatsqs[$i] = $sq;
+		}
+
+
+		foreach(SetupUtils::getPieces() as $type=>$pieces){
+			
+			foreach($pieces as $pos=>&$obj){
+				$this->setup[strtoupper($pos)] = $obj;
+				$sqobj = &$flatsqs[strtoupper($pos)];
+			
+				
+				if($sqobj instanceof ChessSquare)
+				$sqobj->setOccupyingPiece($obj);
+			}
+			
+		}
+
+
+	}
+	public static function getInstance(){
+		if(!isset(self::$_singleton)){
+			self::$_singleton = new self;			
+		}
+		return self::$_singleton;
+	}
+
+} 
+
+class Chesspiece extends stdClass
+{
+	public $type, $kolor, $pos;
+
+	public function __construct($pos){
+	
+		$this->pos= $pos;
 		$this->type = strtolower(static::$objName);
 		$this->kolor = strtolower(static::$color);
 	}
 	public static function get($pos){
 		$class = static::$objName . 'Factory';
 		return $class::create($pos, static::$color . static::$objName);
+	}
+
+	public function reload(ChessSquare $cs){
+		$this->pos($cs->pos);
+		$this->setIllegalCoordinates();
+		
+	}
+	public function setIllegalCoordinates(){
+
 	}
 }
 class Chesspieces 
@@ -18,16 +88,64 @@ class Chesspieces
 		$class = static::$entityName;
 		$instances = array();
 		foreach(static::$instancesByStartPosition as $instanceByPosition){
-			$instances[$instanceByPosition] = $class::get($instanceByPosition);
+			$ins = $class::get($instanceByPosition);
+			$ins = &$ins;
+			//if($class == 'WhiteBishop')
+			//die(var_dump($instanceByPosition));
+			
+			$instances[$instanceByPosition] = $ins;
 		} 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		return $instances;
 	}
 }
 class Bishop extends Chesspiece
 {
 	public static $objName = 'Bishop';
-	public function __construct(){
-		parent::__construct();
+
+
+	public $pos;
+
+
+	public function __construct($pos){
+		parent::__construct($pos);
+	
+		if($this->pos ==='C1' && !isset($this->queenkingside)) {
+		 	$this->queenkingside = 'q'; 
+		 }
+		 if($this->pos ==='F1' && !isset($this->queenkingside)) {
+		 	$this->queenkingside = 'k'; 
+		 }
+
+			/* 
+			if(strtolower($instanceByPosition) === 'c1'){
+				$ins->queenkingside = 'q'; 
+			}
+			if(strtolower($instanceByPosition) === 'f1'){
+				$ins->queenkingside = 'k'; 
+			} */
+			
+
+
+
+
+
+
 	}
 }
 class BishopFactory {
@@ -42,8 +160,8 @@ class Knight extends Chesspiece
 {
 	//$curPos;
 	public static $objName = 'Knight';
-	public function __construct(){
-		parent::__construct();
+	public function __construct($pos){
+		parent::__construct($pos);
 	}
 	public function getLegalMoves(){
 		/* 
@@ -67,8 +185,8 @@ class KnightFactory {
 class Rook extends Chesspiece
 {
 	public static $objName = 'Rook';
-	public function __construct(){
-		parent::__construct();
+	public function __construct($pos){
+		parent::__construct($pos);
 	}
 }
 class RookFactory {
@@ -82,8 +200,8 @@ class RookFactory {
 class Queen extends Chesspiece
 {
 	public static $objName = 'Queen';
-	public function __construct(){
-		parent::__construct();
+	public function __construct($pos){
+		parent::__construct($pos);
 	}
 }
 class QueenFactory {
@@ -97,8 +215,8 @@ class QueenFactory {
 class King extends Chesspiece
 {
 	public static $objName = 'King';
-	public function __construct(){
-		parent::__construct();
+	public function __construct($pos){
+		parent::__construct($pos);
 	}
 }
 class KingFactory {
@@ -112,8 +230,8 @@ class KingFactory {
 class Pawn extends Chesspiece
 {
 	public static $objName = 'Pawn';
-	public function __construct(){
-		parent::__construct();
+	public function __construct($pos){
+		parent::__construct($pos);
 	}
 	
 }
@@ -147,16 +265,17 @@ class WhiteBishop extends Bishop
 
 
 
-	public function __construct(){
+	public function __construct($pos){
 
-		parent::__construct();
+		parent::__construct($pos);
+
 		$this->setIllegalCoordinates(); 	
 	}
 
 
 
 	public function setIllegalCoordinates(){
-		$this->queenkingside = 'q';
+		
 		$this->illegalCoordinates =($this->queenkingside == 'q') 
 			? array('B1','D1','F1','H1', 
 					'A2','C2','E2','G2',
@@ -302,9 +421,15 @@ class BlackPawns extends Chesspieces
 }
 class ChessSquare
 {
-	public $color, $pos, $rank, $col;
+	public $color, $pos = null, $rank, $col, $isOccupied, $occupyingPiece;
 
 	public function __construct($pos){
+		if($pos=='A2'){
+			//die('!');
+		}
+		if(!isset($this->occupyingPiece)){
+			$this->setOccupyingPiece();
+		}
 		$this->pos = strtoupper($pos);
 		$this->rank = substr($this->pos, 1, 1);
 		$this->col = substr($this->pos, 0, 1);
@@ -313,10 +438,20 @@ class ChessSquare
 	public static function get($pos){
 		return new self($pos);
 	}
+	public function getOccupyingPiece(){
+		return $this->occupyingPiece;
+	}
+	public function setOccupyingPiece(ChessPiece $occupyingPiece = null){
+		if(!isset($occupyingPiece)){
+			$this->occupyingPiece = new stdClass();
+		} else {
+			$this->occupyingPiece = $occupyingPiece;
+		}
+	}
 }
 class ChessSquares 
 {
-	private static $allPositions = array(
+	public static $allPositions = array(
 		array('a1','b1','c1','d1','e1','f1','g1','h1'),
 		array('a2','b2','c2','d2','e2','f2','g2','h2'),
 		array('a3','b3','c3','d3','e3','f3','g3','h3'),
@@ -327,6 +462,17 @@ class ChessSquares
 		array('a8','b8','c8','d8','e8','f8','g8','h8')
 	);
 
+	public static $allPositionsFlat = array(
+		'a1','b1','c1','d1','e1','f1','g1','h1',
+		'a2','b2','c2','d2','e2','f2','g2','h2',
+		'a3','b3','c3','d3','e3','f3','g3','h3',
+		'a4','b4','c4','d4','e4','f4','g4','h4',
+		'a5','b5','c5','d5','e5','f5','g5','h5',
+		'a6','b6','c6','d6','e6','f6','g6','h6',
+		'a7','b7','c7','d7','e7','f7','g7','h7',
+		'a8','b8','c8','d8','e8','f8','g8','h8'
+	);
+
 	public static function getAll(){
 		$squares = array();
 		foreach(self::$allPositions as $row) {
@@ -335,24 +481,12 @@ class ChessSquares
 				$squares[$rank][strtoupper($pos)] = ChessSquare::get(strtoupper($pos)); 
 			}
 		}
+		$squares = &$squares;
 		return array_reverse($squares);
 	}
 }
-class ChessBoard extends ChessSquares {
-	
-	public $squares;
 
-	public function __construct(){
-		$this->init();
-	}
-	public function init(){
-		$this->squares = ChessSquares::getAll();
-		$this->setup   = SetupUtils::mapBoard();
-	}
-	public static function get(){
-		return new self;
-	}
-} /*
+/*
 class GameLog {
 
 	public function __construct($glid){
@@ -401,13 +535,7 @@ class SetupUtils {
 
 		$wb = array();
 		$wb = WhiteBishops::getPieces();
-		$wb['c1']->queenkingside = 'q'; 
-		$wb['f1']->queenkingside = 'k';
-		$wb['c1']->setIllegalCoordinates(); 
-		$wb['f1']->setIllegalCoordinates();
-		//die(var_dump($wb));
-		//die(var_dump($wb));	
-		//$queenkingside
+		
 		return array(
 			'pawns'   => array_merge(WhitePawns::getPieces(),   BlackPawns::getPieces()   ),
 			'rooks'   => array_merge(WhiteRooks::getPieces(),   BlackRooks::getPieces()   ),
@@ -418,28 +546,14 @@ class SetupUtils {
 		);
 	}
 	public static function mapBoard(){
-		$setup = array();
-		foreach(self::getPieces() as $type=>$pieces){
-			foreach($pieces as $pos=>&$obj){
-
-				if(strtolower($pos) == 'c1'){
-					$obj->queenkingside = 'q'; 
-					$obj->setIllegalCoordinates(); 	
-				}
-				if(strtolower($pos) == 'f1'){
-					$obj->queenkingside = 'k';
-					$obj->setIllegalCoordinates(); 
-				}
-
-				$setup[strtoupper($pos)] = $obj;
-			}
-		}
-		return $setup;
+		$cbins = ChessBoard::getInstance();
+		
+		return $cbins->setup;
 	}
 }
 class Move 
 {
-
+	public $cb;
 	public function __construct(ChessPiece $movingPiece,
 			ChessSquare $originSquare,
 			ChessSquare $destinationSquare,
@@ -461,12 +575,28 @@ class Move
 
     */
 
+
+	//$movingPiece->onChessSquare = $destinationSquare;
+	//if(!empty($this->destinationSquare->pos))
+	//ChessBoard::getInstance()->updateSquare($this->destinationSquare->pos, $movingPiece );
+
     $this->originSquare      = $originSquare;
 	$this->destinationSquare = $destinationSquare;
 	$this->movingPiece       = $movingPiece;
 	$this->isCheck           = $isCheck;
 	$this->isMate            = $isMate; 
 	$this->valid             = $this->isValid();
+	$this->cb 				 = ChessSquares::$allPositionsFlat;
+	$this->cbvals            = array();
+	foreach($this->cb as $position){
+		if($position==$movingPiece->pos){
+			$this->cbvals[$movingPiece->pos]  = $movingPiece;
+		}
+	}
+
+	$this->destinationSquare->setOccupyingPiece($movingPiece);
+
+
 	}
 
 	public static function cols2Int($color = 'white'){
@@ -523,9 +653,9 @@ class Move
 
 	public function validateKingMove(){
 
-		Move::cols2Int($this->destinationSquare->col ) - Move::cols2Int($this->originSquare->col );;
+		$r= Move::cols2Int($this->destinationSquare->col ) - Move::cols2Int($this->originSquare->col);;
 
-		if ($this->destinationSquare->rank - $this->originSquare->rank == 1  ) {
+		if ($r == 1  ) {
 			return true;
 		}
 		return false;
@@ -610,4 +740,4 @@ class Move
 		return new self( $movingPiece, $originSquare,$destinationSquare, $isCheck, $isMate,$isWhiteMove  );
 	}
 }
-$board = ChessBoard::get();
+$board = ChessBoard::getInstance();
